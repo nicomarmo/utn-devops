@@ -26,7 +26,7 @@ Vagrant.configure("2") do |config|
     sudo systemctl start apache2
 
     # instalar PHP y las extensiones necesarias
-    sudo apt-get install -y php libapache2-mod-php php-mysqli php-xml php-cli php-json
+    sudo apt-get install -y php libapache2-mod-php php-cli
 
     # instalar Git
     sudo apt-get install -y git
