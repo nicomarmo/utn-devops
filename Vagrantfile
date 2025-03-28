@@ -1,59 +1,43 @@
 Vagrant.configure("2") do |config|
   config.vm.box = "ubuntu/jammy64"
 
-  # memoria y CPU
   config.vm.provider "virtualbox" do |vb|
     vb.memory = "2048"   
     vb.cpus = 2      
   end
 
-  # reenvio de puertos
-  config.vm.network "forwarded_port", guest: 80, host: 8080
+  # Cambiado a 8080 para coincidir con docker-compose
+  config.vm.network "forwarded_port", guest: 8080, host: 8080
 
-  # mapear carpeta
   config.vm.synced_folder ".", "/vagrant"
 
-  #script de aprovisionamiento
-  config.vm.provision "shell", inline: <<-SHELL
+  # Enviar archivos clave a la VM
+  config.vm.provision "file", source: "./docker-compose.yml", destination: "/home/vagrant/docker-compose.yml"
+  config.vm.provision "file", source: "./init.sql", destination: "/home/vagrant/init.sql"
+  config.vm.provision "file", source: "./Dockerfile", destination: "/home/vagrant/Dockerfile"
 
-    # actualizar repositorios e instalar dependencias
-    sudo apt-get update
+  config.vm.provision "shell", inline: <<-SHELL
+    # Actualizar sistema
+    sudo apt-get update -y
     sudo apt-get upgrade -y
 
-    # instalar Apache
-    sudo apt-get install -y apache2
-    sudo systemctl enable apache2
-    sudo systemctl start apache2
+    # Limpiar instalaciones previas
+    sudo apt-get remove -y docker docker-engine docker.io containerd runc || true
+    sudo apt-get remove -y --purge php libapache2-mod-php php-cli apache2
 
-    # instalar PHP y las extensiones necesarias
-    sudo apt-get install -y php libapache2-mod-php php-cli
+    # Instalar Docker
+    curl -fsSL https://get.docker.com | sudo sh
+    sudo usermod -aG docker vagrant
+    sudo apt-get update && sudo apt-get install -y docker-compose-plugin
 
-    # instalar Git
-    sudo apt-get install -y git
+    # Iniciar servicios
+    cd /home/vagrant
+    docker compose up -d --build
 
-    # clonar el repositorio en /var/www/html
-    cd /var/www/html
-    sudo rm -rf utn-devops-app #se elimina x si ya existe
-    sudo git clone -b unidad-1 https://github.com/Fichen/utn-devops-app.git utn-devops-app
+    # Esperar con verificación activa
+    echo "Esperando inicialización completa..."
+    sleep 30  # Espera inicial para que los servicios se levanten
+    SHELL
 
-    #eliminar archivo
-    cd /var/www/html/utn-devops-app
-    sudo rm -f template_download.txt
-
-    # cambiar el DocumentRoot de Apache
-    sudo sed -i 's|DocumentRoot /var/www/html|DocumentRoot /var/www/html/utn-devops-app/public|' /etc/apache2/sites-available/000-default.conf
-
-    # cambiar permisos para Apache
-    sudo chown -R www-data:www-data /var/www/html/utn-devops-app/public
-    sudo chmod -R 755 /var/www/html/utn-devops-app/public
-
-    # reiniciar Apache para aplicar cambios
-    sudo systemctl restart apache2
-  SHELL
-  
-  #copiar archivo en VM
-  config.vm.provision "file", source: "C:/Users/Nico/Desktop/UTN-DevOps/Vagrantfile", destination: "/home/vagrant/vagrant-config-ex/Vagrantfile"
-
-  # acceso SSH
   config.ssh.insert_key = false
 end
