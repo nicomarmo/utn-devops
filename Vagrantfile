@@ -2,42 +2,60 @@ Vagrant.configure("2") do |config|
   config.vm.box = "ubuntu/jammy64"
 
   config.vm.provider "virtualbox" do |vb|
-    vb.memory = "2048"   
-    vb.cpus = 2      
+    vb.memory = "4096"
+    vb.cpus = 3
   end
 
-  # Cambiado a 8080 para coincidir con docker-compose
-  config.vm.network "forwarded_port", guest: 8080, host: 8080
-
-  config.vm.synced_folder ".", "/vagrant"
-
-  # Enviar archivos clave a la VM
-  config.vm.provision "file", source: "./docker-compose.yml", destination: "/home/vagrant/docker-compose.yml"
-  config.vm.provision "file", source: "./init.sql", destination: "/home/vagrant/init.sql"
-  config.vm.provision "file", source: "./Dockerfile", destination: "/home/vagrant/Dockerfile"
+  config.vm.network "forwarded_port", guest: 8080, host: 8080 # Jenkins
+  config.vm.network "forwarded_port", guest: 8140, host: 8140 # Puppet
 
   config.vm.provision "shell", inline: <<-SHELL
     # Actualizar sistema
     sudo apt-get update -y
     sudo apt-get upgrade -y
 
-    # Limpiar instalaciones previas
-    sudo apt-get remove -y docker docker-engine docker.io containerd runc || true
-    sudo apt-get remove -y --purge php libapache2-mod-php php-cli apache2
+    # Instalar Puppet
+    wget https://apt.puppetlabs.com/puppet7-release-jammy.deb
+    sudo dpkg -i puppet7-release-jammy.deb
+    sudo apt-get update -y
+    sudo apt-get install -y puppet-agent puppetserver
 
-    # Instalar Docker
-    curl -fsSL https://get.docker.com | sudo sh
-    sudo usermod -aG docker vagrant
-    sudo apt-get update && sudo apt-get install -y docker-compose-plugin
+    # Gestionar usuario y grupo de Puppet
+    if ! id "puppet" &>/dev/null; then
+      sudo useradd -r -m -d /opt/puppet -s /bin/bash puppet
+    fi
 
-    # Iniciar servicios
-    cd /home/vagrant
-    docker compose up -d --build
+    if ! getent group puppet &>/dev/null; then
+      sudo groupadd puppet
+    fi
 
-    # Esperar con verificación activa
-    echo "Esperando inicialización completa..."
-    sleep 30  # Espera inicial para que los servicios se levanten
-    SHELL
+    sudo usermod -aG puppet puppet
 
-  config.ssh.insert_key = false
+    # Crear estructura completa de directorios
+    sudo mkdir -p /etc/puppetlabs/code/environments/production/{manifests,modules,data}
+
+    # Copiar todos los archivos de configuración
+    sudo rsync -av --exclude='.git/' /vagrant/puppet/ /etc/puppetlabs/code/environments/production/
+
+    # Instalar Java (requisito de Jenkins)
+    sudo apt-get install -y openjdk-17-jre
+
+    # Instalar Jenkins con el nuevo método de claves GPG
+    curl -fsSL https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key | sudo tee /usr/share/keyrings/jenkins-keyring.asc > /dev/null
+    echo "deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc] https://pkg.jenkins.io/debian-stable binary/" | sudo tee /etc/apt/sources.list.d/jenkins.list > /dev/null
+    sudo apt-get update
+    sudo apt-get install -y jenkins
+
+    # Habilitar e iniciar Jenkins
+    sudo systemctl enable jenkins
+    sudo systemctl start jenkins
+
+    # Habilitar y arrancar servicios Puppet
+    sudo systemctl enable puppetserver
+    sudo systemctl start puppetserver
+    sleep 30
+    sudo systemctl enable puppet
+    sudo systemctl start puppet
+    sudo /opt/puppetlabs/bin/puppet apply /etc/puppetlabs/code/environments/production/manifests/site.pp
+  SHELL
 end
