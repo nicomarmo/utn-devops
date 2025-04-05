@@ -1,5 +1,4 @@
 class jenkins {
-  # Configurar clave GPG
   exec { 'add_jenkins_key':
     command => '/usr/bin/curl -fsSL https://pkg.jenkins.io/debian-stable/jenkins.io.key | sudo apt-key add -',
     unless  => '/usr/bin/apt-key list | grep -q "Jenkins"',
