@@ -28,7 +28,7 @@ pipeline {
 
         stage('Test') {
             steps {
-                sh 'dotnet test CalculatorApp/CalculatorApp.Tests/CalculatorApp.Tests.csproj --no-build --verbosity normal'
+                sh 'dotnet test CalculatorApp/CalculatorApp.Tests/CalculatorApp.Tests.csproj --verbosity normal'
             }
         }
     }
