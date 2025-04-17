@@ -31,6 +31,11 @@ Vagrant.configure("2") do |config|
     sudo apt-get update -y
     sudo apt-get install -y puppet-agent puppetserver
 
+    # Configurar PATH para todos los usuarios
+    echo 'export DOTNET_ROOT=/usr/share/dotnet' | sudo tee -a /etc/profile
+    echo 'export PATH=$PATH:/usr/share/dotnet' | sudo tee -a /etc/profile
+    source /etc/profile
+
     # Configurar Puppet Server
     sudo sed -i 's/-Xms2g -Xmx2g/-Xms1g -Xmx1g/' /etc/default/puppetserver
 
