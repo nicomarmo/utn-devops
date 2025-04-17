@@ -8,32 +8,28 @@ pipeline {
     stages {
         stage('Clone calculator repo') {
             steps {
-                git url: 'https://github.com/fedecurto98/utn-devops-calculator-app.git', branch: 'main'
+                git url: 'https://github.com/fedecurto98/utn-devops-calculator-app.git', 
+                     branch: 'main'
             }
         }
 
         stage('Restore') {
             steps {
-                sh 'dotnet restore'
+                // Especifica la ruta exacta al archivo del proyecto
+                sh 'dotnet restore CalculatorApp/CalculatorApp/CalculatorApp.csproj'
             }
         }
 
         stage('Build') {
             steps {
-                sh 'dotnet build --configuration Release'
+                sh 'dotnet build CalculatorApp/CalculatorApp/CalculatorApp.csproj --configuration Release'
             }
         }
 
         stage('Test') {
             steps {
-                sh 'dotnet test --no-build --verbosity normal'
+                sh 'dotnet test CalculatorApp/CalculatorApp.Tests/CalculatorApp.Tests.csproj --no-build --verbosity normal'
             }
-        }
-    }
-
-    post {
-        always {
-            echo 'Pipeline finished.'
         }
     }
 }
